@@ -17,7 +17,7 @@ for package in REQUIRED_PACKAGES:
         # Если библиотеки нет — принудительно скачиваем её прямо на старте
         print(f"🔩 Авто-установка недостающего пакета: {package}")
         subprocess.check_call([sys.executable, "-m", "pip", "install", "--no-cache-dir", package])
-        
+
 import discord
 from discord.ext import commands
 try:
@@ -2708,9 +2708,15 @@ def get_g4f_fallback_response(message, user_id=None, username=None):
         return ""
 
     try:
-        endpoint = g4f_base_url.rstrip("/") + "/chat/completions"
+        # Корректная сборка эндпоинта для OpenRouter
+        if "openrouter.ai" in g4f_base_url:
+            endpoint = "https://openrouter.ai"
+        else:
+            endpoint = g4f_base_url.rstrip("/") + "/chat/completions"
+
         user_id_str = str(user_id) if user_id else "unknown"
         memory_facts = get_user_memory_facts(user_id_str)
+    
         system_parts = [
             "Ты — Discord-бот Гена, созданный Binar. Отвечай кратко и по делу.",
             "Не используй Discord-инструменты, не пингуй людей и не выполняй админ-действия.",
@@ -2727,24 +2733,38 @@ def get_g4f_fallback_response(message, user_id=None, username=None):
             ],
             "stream": False,
         }
-        response = requests.post(endpoint, json=payload, timeout=g4f_timeout)
+        
+        # Передаем обязательные заголовки авторизации OpenRouter
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://github.com",
+            "X-Title": "Gena Discord Bot"
+        }
+        
+        response = requests.post(endpoint, json=payload, headers=headers, timeout=g4f_timeout)
         if response.status_code != 200:
             print(f"Ошибка g4f fallback: {response.status_code} {response.text[:160]}")
             globals()["g4f_disabled_until"] = time.time() + g4f_retry_cooldown_seconds
             return ""
+            
         data = response.json()
         choices = data.get("choices") or []
         if not choices:
             globals()["g4f_disabled_until"] = time.time() + g4f_retry_cooldown_seconds
             return ""
+            
         first = choices[0] or {}
         message_obj = first.get("message") or {}
         content = message_obj.get("content") or first.get("text") or ""
         content = sanitize_bot_response(strip_terminal_control(content))
+        
         if len(content) > max_response_length:
             content = content[:max_response_length] + "..."
+            
         globals()["g4f_disabled_until"] = 0.0
         return content
+        
     except Exception as error:
         print(f"Ошибка при вызове g4f fallback: {error}")
         globals()["g4f_disabled_until"] = time.time() + g4f_retry_cooldown_seconds
