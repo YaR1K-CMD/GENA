@@ -2708,15 +2708,12 @@ def get_g4f_fallback_response(message, user_id=None, username=None):
         return ""
 
     try:
-        # Корректная сборка эндпоинта для OpenRouter
-        if "openrouter.ai" in g4f_base_url:
-            endpoint = "https://openrouter.ai"
-        else:
-            endpoint = g4f_base_url.rstrip("/") + "/chat/completions"
+        # ЖЕСТКО прописываем правильный адрес, так как мы точно на OpenRouter
+        endpoint = "https://openrouter.ai/api/v1/chat/completions"
 
         user_id_str = str(user_id) if user_id else "unknown"
         memory_facts = get_user_memory_facts(user_id_str)
-    
+
         system_parts = [
             "Ты — Discord-бот Гена, созданный Binar. Отвечай кратко и по делу.",
             "Не используй Discord-инструменты, не пингуй людей и не выполняй админ-действия.",
