@@ -4362,10 +4362,15 @@ async def _graceful_shutdown():
 
 def run_main_loop():
     """Запускает py-cord бота на loop, к которому он был привязан при создании."""
-    loop = getattr(bot, "loop", None)
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
     if loop is None or loop.is_closed():
         loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+        asyncio.set_event_loop(loop)
+        
     try:
         loop.run_until_complete(run_bot_with_reconnect())
     finally:
@@ -4377,7 +4382,7 @@ def run_main_loop():
                 task.cancel()
             if pending:
                 loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-
+                
 def _ensure_dirs_for_save_reactions():
     try:
         log_dir = os.path.join(os.path.dirname(__file__), 'logs')
