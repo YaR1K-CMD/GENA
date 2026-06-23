@@ -2592,10 +2592,17 @@ async def process_single_question(question: str, user_id=None, username=None, gu
 
 # Функция для получения ответа от Ollama API
 def _g4f_models_url() -> str:
+    # Если адрес ведет на OpenRouter, отдаем его стандартный эндпоинт моделей
+    if "openrouter.ai" in g4f_base_url:
+        return "https://openrouter.ai"
     return g4f_base_url.rstrip("/") + "/models"
 
 
 def is_g4f_service_available() -> bool:
+    # Если мы используем OpenRouter, сервис априори доступен, 
+    # не нужно пытаться парсить локальные модели g4f
+    if "openrouter.ai" in g4f_base_url:
+        return True
     try:
         response = requests.get(_g4f_models_url(), timeout=2)
         return response.status_code == 200
