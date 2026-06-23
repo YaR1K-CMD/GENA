@@ -1,3 +1,23 @@
+import subprocess
+import sys
+
+# Список библиотек, которые хостинг упорно забывает установить
+REQUIRED_PACKAGES = [
+    "py-cord==2.6.1", "fastapi", "uvicorn", "pydantic", 
+    "asyncpg", "pillow", "pytesseract", "opencv-python-headless"
+]
+
+for package in REQUIRED_PACKAGES:
+    try:
+        # Проверяем, установлена ли библиотека
+        pkg_name = package.split("==")[0]
+        if pkg_name == "py-cord": pkg_name = "discord"
+        __import__(pkg_name)
+    except ImportError:
+        # Если библиотеки нет — принудительно скачиваем её прямо на старте
+        print(f"🔩 Авто-установка недостающего пакета: {package}")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "--no-cache-dir", package])
+        
 import discord
 from discord.ext import commands
 try:
