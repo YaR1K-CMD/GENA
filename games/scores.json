@@ -1,0 +1,22 @@
+{
+  "1206560204959911977": {
+    "tictactoe_wins": 0,
+    "tictactoe_losses": 1,
+    "tictactoe_draws": 0,
+    "guess_wins": 0,
+    "guess_losses": 1,
+    "rps_wins": 0,
+    "rps_losses": 0,
+    "rps_draws": 0
+  },
+  "1097813518008459364": {
+    "tictactoe_wins": 0,
+    "tictactoe_losses": 0,
+    "tictactoe_draws": 0,
+    "guess_wins": 0,
+    "guess_losses": 0,
+    "rps_wins": 0,
+    "rps_losses": 4,
+    "rps_draws": 2
+  }
+}

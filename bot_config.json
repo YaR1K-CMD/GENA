@@ -1,0 +1,118 @@
+{
+    "allowed_channels": [
+        "1458548054431895713",
+        "1154700115219583004",
+        "1458769294602276897",
+        "1154700115622240269"
+    ],
+    "ping_responses": [
+        "Привет! Я здесь, чтобы помочь.",
+        "Меня позвали? Чем могу помочь?",
+        "Ты меня позвал? Я готов к общению!",
+        "Привет-привет!",
+        "Засек пинг! Чем могу быть полезен?"
+    ],
+    "memory_enabled": true,
+    "cloud_ai_enabled": true,
+    "g4f_fallback_enabled": true,
+    "g4f_auto_start_enabled": true,
+    "g4f_base_url": "http://localhost:1337/v1",
+    "g4f_model": "gpt-4o-mini",
+    "g4f_timeout": 60,
+    "g4f_retry_cooldown_seconds": 180,
+    "g4f_docker_image": "hlohaus789/g4f:latest-slim",
+    "g4f_container_name": "gena-g4f",
+    "max_response_length": 1000,
+    "silly_responses_enabled": false,
+    "silly_response_chance": 0,
+    "auto_reply_enabled": true,
+    "admin_users": [
+        "1206560204959911977",
+        "919500829663318076",
+        "392676359056654348",
+        "1346554290667388969",
+        "1143506713954234529",
+        "1346554767446507521",
+        "1346554290667388969"
+    ],
+    "admin_roles": [
+        "Admin",
+        "Модератор",
+        "Owner",
+        "1346554290667388969"
+    ],
+    "moderator_roles": [
+        "Модератор",
+        "Helper"
+    ],
+    "command_permissions": {
+        "learn": [
+            "Admin",
+            "Модератор",
+            "Owner",
+            "1346554290667388969"
+        ],
+        "clear_memory": [
+            "Admin",
+            "Модератор",
+            "Owner",
+            "1346554290667388969"
+        ],
+        "set_model": [
+            "Admin",
+            "Модератор",
+            "Owner",
+            "1346554290667388969"
+        ],
+        "add_channel": [
+            "Admin",
+            "Модератор",
+            "Owner",
+            "1346554290667388969"
+        ],
+        "remove_channel": [
+            "Admin",
+            "Модератор",
+            "Owner",
+            "1346554290667388969"
+        ],
+        "add_role_permission": [
+            "Admin",
+            "Owner",
+            "1346554290667388969"
+        ],
+        "remove_role_permission": [
+            "Admin",
+            "Owner",
+            "1346554290667388969"
+        ],
+        "list_permissions": [
+            "Admin",
+            "Модератор",
+            "Owner",
+            "1346554290667388969"
+        ],
+        "profile": [
+            "Admin",
+            "Модератор",
+            "Owner",
+            "1346554290667388969"
+        ],
+        "show_profile": [
+            "Admin",
+            "Модератор",
+            "Owner",
+            "1346554290667388969"
+        ]
+    },
+    "ollama_model": "minimax-m3:cloud",
+    "ollama_vision_model": "",
+    "ollama_fallback_models": [
+        "gpt-oss:120b-cloud",
+        "llama3:8b",
+        "llama3.2:3b",
+        "gemma3:4b",
+        "llama2:latest"
+    ],
+    "activity_app_id": ""
+}
