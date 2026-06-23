@@ -2592,7 +2592,7 @@ async def process_single_question(question: str, user_id=None, username=None, gu
 
 # Функция для получения ответа от Ollama API
 def _g4f_models_url() -> str:
-    # Если адрес ведет на OpenRouter, отдаем его стандартный эндпоинт моделей
+    # Если адрес ведет на OpenRouter, отдаем полный корректный эндпоинт моделей
     if "openrouter.ai" in g4f_base_url:
         return "https://openrouter.ai"
     return g4f_base_url.rstrip("/") + "/models"
@@ -2760,10 +2760,12 @@ def get_openrouter_fallback_response(message, user_id=None, username=None):
         }
 
         headers = {
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-            "HTTP-Referer": "https://github.com/your-bot",  # рекомендуется OpenRouter
-            "X-Title": "Gena Discord Bot",
-        }
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://bothost.tech", # Ваш домен на хостинге
+        "X-Title": "Gennadiy Bot"
+}
+
 
         response = requests.post(endpoint, json=payload, headers=headers, timeout=45)
         
