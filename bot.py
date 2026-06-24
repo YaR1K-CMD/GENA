@@ -1,70 +1,42 @@
-import discord
-from discord.ext import commands
-try:
-    from discord import app_commands  # type: ignore  # pyright: ignore[reportMissingImports,reportUnknownVariableType]
-except Exception:
-    app_commands = None
-import asyncio
 import os
 import sys
-import json
-import random
-import re
-import subprocess
-import time
-import requests
-import traceback
-import tempfile
-import html as html_lib
-import base64
 from pathlib import Path
-from urllib.parse import parse_qs, unquote, urlsplit, quote
-from difflib import SequenceMatcher
 from dotenv import load_dotenv
-from bot_memory_tools import (
-    append_channel_message,
-    append_user_message,
-    can_bot_react,
-    can_bot_send,
-    can_post_to_channel,
-    ensure_memory_schema,
-    extract_memory_facts,
-    find_known_member,
-    format_member_mention,
-    get_online_members,
-    load_json,
-    is_ping_summary_request,
-    render_channel_history,
-    render_user_history,
-    resolve_member,
-    resolve_role,
-    resolve_text_channel,
-    save_json,
-    summarize_memory_facts,
-    summarize_message_mentions,
-    remember_user_facts,
-    upsert_known_member,
-)
 
-OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "0164b3f12ac44a04b27a609c4835b8f8._Wb90mNzhRycM4E8CbIlRrAh")
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "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")
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-
-# Загружаем переменные окружения как можно раньше
+# ==============================================================================
+# 1. ЗАГРУЗКА ОКРУЖЕНИЯ (СТРОГО ДО ЧТЕНИЯ ПЕРЕМЕННЫХ И ИМПОРТОВ СТОРОННИХ МОДУЛЕЙ)
+# ==============================================================================
 load_dotenv(dotenv_path=Path(__file__).with_name(".env"), override=True)
 
-# Буферизуем ранние сообщения, чтобы показывать их после загрузки
+# Теперь ключи гарантированно прочитаются из вашего .env файла
+OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "0164b3f12ac44a04b27a609c4835b8f8._Wb90mNzhRycM4E8CbIlRrAh")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "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")
+OPENROUTER_BASE_URL = "https://openrouter.ai"
+
+# Глобальные заглушки для предотвращения ошибок статического анализа ( reportUnboundVariable )
+config: dict = {}
+
+# ==============================================================================
+# 2. ПЕРЕХВАТ РАННЕГО ВЫВОДА (ПЕЧАТЬ В БУФЕР ДО НАСТРОЙКИ ЛОГГЕРА)
+# ==============================================================================
 _early_logs = []
 import builtins as _builtins
 import atexit as _atexit
 _orig_print = _builtins.print
+
+# Буферизуем ранние сообщения, чтобы показывать их после загрузки логгера
+_early_logs = []
+import builtins as _builtins
+import atexit as _atexit
+_orig_print = _builtins.print
+
 def _early_print(*args, **kwargs):
     _early_logs.append(" ".join(str(a) for a in args))
 _builtins.print = _early_print
 
+
 def _flush_early_logs():
     try:
-        # Перед выходом — сохранить ранние логи в файл через logger (если есть)
         for _line in _early_logs:
             try:
                 if 'logger' in globals() and hasattr(logger, '_write'):
@@ -87,7 +59,6 @@ def _flush_early_logs():
                     _orig_print(_line)
                 except Exception:
                     pass
-        # Теперь назначаем print — писать в logger или молчать в консоли по настройке
         if 'logger' in globals():
             def _print_to_logger_at_exit(*args, **kwargs):
                 try:
@@ -117,16 +88,70 @@ def _flush_early_logs():
 
 _atexit.register(_flush_early_logs)
 
-# Гарантируем UTF-8 вывод в Windows-консоли (исключаем падение на эмодзи)
+# Фикс кодировки консоли Windows под UTF-8 (для эмодзи)
 try:
     sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
 except Exception:
     pass
 
-# Импортируем AI инструменты
+# ==============================================================================
+# 3. ИМПОРТЫ СТАНДАРТНЫХ И СТОРОННИХ БИБЛИОТЕК
+# ==============================================================================
+import discord
+from discord.ext import commands
+try:
+    from discord import app_commands  # type: ignore  # pyright: ignore[reportMissingImports,reportUnknownVariableType]
+except Exception:
+    app_commands = None
+
+import asyncio
+import json
+import random
+import re
+import subprocess
+import time
+import requests
+import traceback
+import tempfile
+import html as html_lib
+import base64
+from urllib.parse import parse_qs, unquote, urlsplit, quote
+from difflib import SequenceMatcher
+
+# ==============================================================================
+# 4. ИМПОРТ ИНСТРУМЕНТОВ СИСТЕМЫ ПАМЯТИ БОТА
+# ==============================================================================
+from bot_memory_tools import (
+    append_channel_message,
+    append_user_message,
+    can_bot_react,
+    can_bot_send,
+    can_post_to_channel,
+    ensure_memory_schema,
+    extract_memory_facts,
+    find_known_member,
+    format_member_mention,
+    get_online_members,
+    load_json,
+    is_ping_summary_request,
+    render_channel_history,
+    render_user_history,
+    resolve_member,
+    resolve_role,
+    resolve_text_channel,
+    save_json,
+    summarize_memory_facts,
+    summarize_message_mentions,
+    remember_user_facts,
+    upsert_known_member,
+)
+
+# ==============================================================================
+# 5. ИМПОРТЫ ДОПОЛНИТЕЛЬНЫХ МОДУЛЕЙ БОТА (AI И ИГРЫ)
+# ==============================================================================
 ai_tools = None
 try:
-    from servers.ai_tools import ai_tools  # type: ignore
+    from servers.ai_tools import ai_tools  # type: ignore # pyright: ignore[reportMissingImports]
     AI_TOOLS_AVAILABLE = True
     print(" AI инструменты доступны")
 except ImportError as e:
@@ -134,21 +159,38 @@ except ImportError as e:
     print(f" AI инструменты недоступны: {e}")
 
 setup_games = None
-# Импортируем игровые модули
 try:
-    from games.discord_integration import setup_games
+    from games.discord_integration import setup_games # pyright: ignore[reportMissingImports]
     GAMES_ENABLED = True
     print(" Игровые модули успешно импортированы")
 except ImportError as e:
     GAMES_ENABLED = False
     print(f" Игровые модули недоступны: {e}")
 
-# Импортируем наш логгер
+# Добавляем подавление предупреждения для динамического импорта распознавания изображений
 try:
-    import sys
+    from servers import image_recognition # type: ignore # pyright: ignore[reportMissingImports]
+except ImportError:
+    pass
+
+# ==============================================================================
+# 6. ИНИЦИАЛИЗАЦИЯ СИСТЕМЫ ЛОГИРОВАНИЯ И ПЕРЕХВАТ PRINT
+# ==============================================================================
+try:
     sys.path.append(os.path.join(os.path.dirname(__file__), 'tools'))
+    
+    # Отключаем буферизацию принтов перед импортом проблемного модуля
+    import builtins as _builtins
+    if '_orig_print' in globals():
+        _builtins.print = _orig_print
+        
+    print("🔍 Попытка импорта основного логгера из tools/logger.py...")
+    
+    # Пробуем импортировать логгер
     from logger import logger  # pyright: ignore[reportMissingImports]
-    # Переназначаем встроенный print: он будет писать в лог-файл logger если console выключён, иначе в stdout
+    
+    print("✅ Основной логгер успешно импортирован!")
+    
     def _print_to_logger_imported(*args, **kwargs):
         try:
             text = " ".join(str(a) for a in args)
@@ -157,7 +199,6 @@ try:
             else:
                 try:
                     if hasattr(logger, '_write'):
-                        # prevent recursion if logger._write uses print
                         _saved_print = _builtins.print
                         try:
                             _builtins.print = _orig_print
@@ -178,9 +219,20 @@ try:
         except Exception:
             _orig_print(*args, **kwargs)
     _builtins.print = _print_to_logger_imported
-except ImportError:
-    # Если внешний logger недоступен — используем встроенный SimpleLogger и подавляем прямой вывод print в консоль (по умолчанию)
-    print(" Модуль logger не найден в tools/, используем базовый лог")
+
+except Exception as e:
+    # Если логгер упал во время своего выполнения — мы поймаем его здесь!
+    import builtins as _builtins
+    if '_orig_print' in globals():
+        _builtins.print = _orig_print
+    print("\n" + "💥" * 20)
+    print("КРИТИЧЕСКАЯ ОШИБКА ПРИ ВЫПОЛНЕНИИ ФАЙЛА tools/logger.py:")
+    print("💥" * 20)
+    traceback.print_exc(file=sys.stdout)
+    print("=" * 50 + "\n")
+    
+    # Переходим на резервный безопасный логгер, чтобы бот не падал
+    print("⚠️ Переключаюсь на аварийный SimpleLogger...")
     import logging
     logging.basicConfig(level=logging.INFO)
     
@@ -192,9 +244,8 @@ except ImportError:
             self._loading_total = 0
             self._loading_current = 0
             self._loading_buffer = []
-            self.console = False  # По умолчанию не писать в консоль, только в logs/
+            self.console = True  # Включаем вывод в консоль при аварии
 
-            # Инициализируем файл логов
             try:
                 log_dir = os.path.join(os.path.dirname(__file__), 'logs')
                 os.makedirs(log_dir, exist_ok=True)
@@ -210,9 +261,9 @@ except ImportError:
 
         def _close(self):
             try:
-                if getattr(self, '_file', None):
-                    self._file.flush()
-                    self._file.close()
+                if getattr(self, '_file', None) is not None:
+                    self._file.flush() # type: ignore
+                    self._file.close() # type: ignore
             except Exception:
                 pass
 
@@ -220,9 +271,9 @@ except ImportError:
             ts = time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())
             line = f"[{ts}] {text}"
             try:
-                if self._file:
-                    self._file.write(line + "\n")
-                    self._file.flush()
+                if getattr(self, '_file', None) is not None:
+                    self._file.write(line + "\n") # type: ignore
+                    self._file.flush() # type: ignore
             except Exception:
                 pass
             if self.console:
@@ -231,139 +282,92 @@ except ImportError:
                 except Exception:
                     pass
 
-        def _print_status(self, percent, msg):
-            # Пишем прогресс в лог, не выводим ASCII-бар в консоль по умолчанию
-            width = 34
-            filled = int(width * percent / 100)
-            bar = "#" * filled + " " * (width - filled)
-            line = f"GEN OS |{bar}| {percent:3d}%  {msg}"
-            self._status_len = len(line)
-            self._write(line)
-
-        def _clear_status(self):
-            # Ничего не нужно делать для консоли в тихом режиме
-            self._status_active = False
-
-        def loading_begin(self, total_steps: int):
-            self._loading_active = True
-            self._loading_total = max(total_steps, 1)
-            self._loading_current = 0
-            self._loading_start_ts = time.time()
-            banner = [
-                "██████╗ ███████╗███╗   ██╗ ██████╗ ███████╗",
-                "██╔════╝ ██╔════╝████╗  ██║██╔═══██╗██╔════╝",
-                "██║  ███╗█████╗  ██╔██╗ ██║██║   ██║███████╗",
-                "██║   ██║██╔══╝  ██║╚██╗██║██║   ██║╚════██║",
-                "╚██████╔╝███████╗██║ ╚████║╚██████╔╝███████║",
-                " ╚═════╝ ╚══════╝╚═╝  ╚═══╝ ╚═════╝ ╚══════╝",
-            ]
-            for line in banner:
-                self._write(line)
-
-        def loading_step(self, msg: str):
-            if not self._loading_active:
-                return
-            time.sleep(0.2)
-            self._loading_current = min(self._loading_current + 1, self._loading_total)
-            percent = int(self._loading_current / self._loading_total * 100)
-            self._print_status(percent, msg)
-
-        def loading_end(self):
-            if not self._loading_active:
-                return
-            self._print_status(100, "SUCCESS LOAD")
-            self._loading_active = False
-
-        def loading_flush(self):
-            if self._loading_buffer:
-                for line in self._loading_buffer:
-                    self._write(line)
-                self._loading_buffer.clear()
-
-        def info(self, msg):
-            if self._loading_active:
-                self._loading_buffer.append(f"ℹ {msg}")
-                return
-            self._clear_status()
-            self._write(f"ℹ {msg}")
-        
-        def error(self, msg, e=None):
-            if self._loading_active:
-                self._loading_buffer.append(f" {msg}")
-                return
-            self._clear_status()
-            self._write(f"❌ {msg}")
-            if e:
-                self._write(f"   {e}")
-        
-        def system(self, msg):
-            if self._loading_active:
-                self._loading_buffer.append(f" {msg}")
-                return
-            self._clear_status()
-            self._write(f"{msg}")
-        
-        def discord(self, msg):
-            if self._loading_active:
-                self._loading_buffer.append(f" {msg}")
-                return
-            self._clear_status()
-            self._write(f"{msg}")
-        
-        def ollama(self, msg):
-            if self._loading_active:
-                self._loading_buffer.append(f" {msg}")
-                return
-            self._clear_status()
-            self._write(f"{msg}")
-     
-        def debug(self, msg):
-            if self._loading_active:
-                self._loading_buffer.append(f" {msg}")
-                return
-            self._clear_status()
-            self._write(f"DEBUG: {msg}")
-        
-        def log_system_info(self):
-            self._write("Системная информация пропущена")
-        
-        def log_discord_connection(self, success, error=None):
-            self._write(f"Discord: {'Успешно' if success else 'Ошибка'}")
-        
-        def log_ollama_request(self, model, prompt_length, response_length=None, error=None):
-            self._write(f"Ollama: {model} - {'✅' if not error else '❌'}")
-        
-        def log_memory_operation(self, operation, user_id, details=""):
-            self._write(f"Память: {operation} для {user_id} {details}")
-
-        def set_console(self, enabled: bool):
-            self.console = bool(enabled)
-
-    logger = SimpleLogger()
-    # Переназначаем встроенный print: теперь он пишет в лог-файл или молчит в зависимости от logger.console
-    def _print_to_logger(*args, **kwargs):
-        try:
+        def debug(self, *args, **_kwargs):
             text = " ".join(str(a) for a in args)
-            if getattr(logger, 'console', False):
-                _orig_print(text, **kwargs)
-            else:
-                # Пишем в лог-файл, избегая рекурсии если logger использует print
-                try:
-                    _saved_print = _builtins.print
-                    try:
-                        _builtins.print = _orig_print
-                        logger._write(text)
-                    finally:
-                        _builtins.print = _saved_print
-                except Exception:
-                    pass
-        except Exception:
+            self._write(f"[DEBUG] {text}")
+
+        def error(self, *args, **_kwargs):
+            text = " ".join(str(a) for a in args)
+            self._write(f"[ERROR] {text}")
+
+        def info(self, *args, **_kwargs):
+            text = " ".join(str(a) for a in args)
+            self._write(f"[INFO] {text}")
+
+        def system(self, *args, **_kwargs):
+            text = " ".join(str(a) for a in args)
+            self._write(f"[SYSTEM] {text}")
+
+        def discord(self, *args, **_kwargs):
+            text = " ".join(str(a) for a in args)
+            self._write(f"[DISCORD] {text}")
+
+        def log_system_info(self, *args, **_kwargs):
+            text = " ".join(str(a) for a in args)
+            self._write(f"[SYS INFO] {text}")
+
+        def loading_step(self, *args, **_kwargs):
+            text = " ".join(str(a) for a in args)
+            self._write(f"[LOADING STEP] {text}")
+
+        def loading_begin(self, *args, **_kwargs):
+            text = " ".join(str(a) for a in args)
+            self._write(f"[LOADING BEGIN] {text}")
+
+        def loading_end(self, *args, **_kwargs):
+            text = " ".join(str(a) for a in args)
+            self._write(f"[LOADING END] {text}")
+
+        def loading_flush(self, *args, **_kwargs):
+            text = " ".join(str(a) for a in args)
+            self._write(f"[LOADING FLUSH] {text}")
+
+        def ollama(self, *args, **_kwargs):
+            text = " ".join(str(a) for a in args)
+            self._write(f"[OLLAMA] {text}")
+
+        def log_ollama_request(self, *args, **_kwargs):
+            text = " ".join(str(a) for a in args)
+            self._write(f"[OLLAMA REQ] {text}")
+
+        def set_console(self, status: bool):
+            self.console = status
+            self._write(f"[SYSTEM] Console output set to {status}")
+
+        def _print_status(self, percent, msg):
+            pass
+            
+    logger = SimpleLogger()
+  
+# Объявляем глобальную переменную config на самом верхнем уровне файла
+#global config
+config: dict = {}
+   
+       
+
+def _print_to_logger(*args, **kwargs):
+    try:
+        text = " ".join(str(a) for a in args)
+        if getattr(logger, 'console', False):
+            _orig_print(text, **kwargs)
+        else:
+            # Пишем в лог-файл, избегая рекурсии если logger использует print
             try:
-                _orig_print(*args, **kwargs)
+                _saved_print = _builtins.print
+                try:
+                    _builtins.print = _orig_print
+                    logger._write(text)
+                finally:
+                    _builtins.print = _saved_print
             except Exception:
                 pass
-    _builtins.print = _print_to_logger
+    except Exception:
+        try:
+            _orig_print(*args, **kwargs)
+        except Exception:
+            pass
 
+_builtins.print = _print_to_logger
 
 # ==================== VISUAL EFFECTS =====================
 import asyncio
@@ -431,7 +435,7 @@ recognize_image_from_file = None
 recognize_image_from_bytes = None
 # ==================== IMAGE RECOGNITION =====================
 try:
-    from servers.image_recognition import recognize_image_from_file, recognize_image_from_bytes
+    from servers.image_recognition import recognize_image_from_file, recognize_image_from_bytes # type: ignore # pyright: ignore[reportMissingImports]
     IMAGE_RECOGNITION_AVAILABLE = True
     print(" Распознавание изображений доступно")
 except ImportError as e:
@@ -875,19 +879,29 @@ def tool_get_knowledge(key: str) -> Optional[str]:
 
 # Новые функции инструментов
 async def tool_get_time(location: str = "UTC") -> str:
-    """Получить текущее время"""
-    if not AI_TOOLS_AVAILABLE:
-        return "Инструменты времени недоступны."
+    """Получить текущее время (использует ai_tools или системное datetime в качестве резерва)"""
+    # 1. Пробуем получить время через ai_tools, если они доступны
+    if AI_TOOLS_AVAILABLE and ai_tools is not None:
+        try:
+            result = await ai_tools.get_current_time(location)
+            if "error" not in result:
+                return f" Текущее время: {result['time']}\n Дата: {result['date']}\n День недели: {result['day']}\n Часовой пояс: {result['timezone']}"
+        except Exception as e:
+            logger.error(f"Ошибка ai_tools времени, переключаюсь на систему: {e}")
+
+    # 2. Резервный вариант: если инструменты недоступны, берем системное время
     try:
-        if ai_tools is None:
-            return "Инструменты времени недоступны."
-        result = await ai_tools.get_current_time(location)
-        if "error" not in result:
-            return f" Текущее время: {result['time']}\n Дата: {result['date']}\n День недели: {result['day']}\n Часовой пояс: {result['timezone']}"
-        else:
-            return f"Ошибка получения времени: {result.get('error')}"
+        from datetime import datetime as _dt, timezone as _tz
+        now_utc = _dt.now(_tz.utc).strftime("%H:%M:%S")
+        now_local = _dt.now().strftime("%H:%M:%S")
+        date_str = _dt.now().strftime("%Y-%m-%d")
+        
+        msg = f" Текущее время (Системное):\n Локальное: {now_local}\n UTC: {now_utc}\n Дата: {date_str}"
+        if location and location.lower() != "utc":
+            msg += f"\n (Примечание: поиск для локации '{location}' выполнен по системному времени, так как база часовых поясов недоступна)"
+        return msg
     except Exception as e:
-        logger.error(f"Ошибка инструмента времени: {e}")
+        logger.error(f"Критическая ошибка получения времени: {e}")
         return f"Ошибка получения времени: {str(e)}"
 
 async def tool_get_weather(location: str = "Moscow") -> str:
@@ -1198,21 +1212,6 @@ async def tool_list_channels(guild_id, user_id=None) -> str:
         return "\n".join(lines)[:1900]
     except Exception as e:
         return f"Ошибка при получении каналов: {e}"
-
-
-async def tool_get_time(location: str = "") -> str:
-    """Возвращает текущее системное локальное и UTC время. Если указана локация — возвращает локальное/UTC и сообщает, что локализация не настроена."""
-    try:
-        from datetime import datetime as _dt
-        local = _dt.now()
-        utc = _dt.utcnow()
-        msg = f"Локальное время: {local.strftime('%Y-%m-%d %H:%M:%S')}\nUTC: {utc.strftime('%Y-%m-%d %H:%M:%S')}"
-        if location and location.strip() and location.strip().lower() not in ('', 'utc', 'local'):
-            msg += f"\nПримечание: локализация по месту '{location}' не настроена."
-        return msg
-    except Exception as e:
-        return f"Ошибка при получении времени: {e}"
-
 
 async def tool_ping_user(guild_id, current_channel_id, query, text, user_id) -> str:
     guild = get_tool_guild(guild_id)
@@ -3149,6 +3148,8 @@ async def reload_config_command(interaction: discord.Interaction):
 @bot.tree.command(name="set_config", description="Изменить bot_config.json и применить изменения в realtime (админ)")
 @app_commands.describe(key="Ключ конфигурации (например: memory_enabled)", value="Значение в JSON или как строка")
 async def set_config_command(interaction: discord.Interaction, key: str, value: str):
+    global config
+
     if not is_admin_user(interaction.user):
         await interaction.response.send_message("❌ Недостаточно прав.", ephemeral=True)
         return
@@ -3381,6 +3382,7 @@ async def collect_reaction_users(reaction, limit=50):
     return users
 
 
+
 def resolve_emoji(guild, emoji_query: str):
     """Разрешает эмодзи: unicode, <:name:id>, id или имя серверного эмодзи."""
     q = str(emoji_query or "").strip()
@@ -3390,7 +3392,8 @@ def resolve_emoji(guild, emoji_query: str):
     m = re.match(r"^<(a)?:([^:>]+):(\d+)>$", q)
     if m:
         animated = bool(m.group(1))
-        name = m.group(2)
+        # Принудительно приводим к str и задаем фолбек, чтобы Pylance не ругался
+        name = str(m.group(2) or "emoji")
         try:
             eid = int(m.group(3))
         except Exception:
@@ -3400,16 +3403,7 @@ def resolve_emoji(guild, emoji_query: str):
                 return discord.PartialEmoji(name=name, id=eid, animated=animated)
         except Exception:
             pass
-    # Если передан чистый ID
-    if q.isdigit():
-        try:
-            eid = int(q)
-            emoji_obj = guild.get_emoji(eid)
-            if emoji_obj:
-                return emoji_obj
-            return discord.PartialEmoji(id=eid)
-        except Exception:
-            pass
+
     # Поиск по имени в гильдии
     try:
         emoji_obj = discord.utils.get(guild.emojis, name=q)
@@ -3983,34 +3977,40 @@ async def on_message(message):
 
             # Проверяем команды игр
             if content.startswith('!game') or content.startswith('/game') or content.startswith('!игра') or content.startswith('/игра'):
-                from games.discord_integration import discord_integration
+                from games.discord_integration import discord_integration # type: ignore # pyright: ignore[reportMissingImports]
                 args = content.split()[1:] if len(content.split()) > 1 else []
                 await discord_integration.cmd_game(message, args)
                 return
 
             if content.startswith('!move') or content.startswith('/move') or content.startswith('!ход') or content.startswith('/ход'):
-                from games.discord_integration import discord_integration
+                from games.discord_integration import discord_integration # type: ignore # pyright: ignore[reportMissingImports]
                 args = content.split()[1:] if len(content.split()) > 1 else []
                 await discord_integration.cmd_move(message, args)
                 return
 
             if content.startswith('!scores') or content.startswith('/scores') or content.startswith('!статистика') or content.startswith('/статистика'):
-                from games.discord_integration import discord_integration
+                from games.discord_integration import discord_integration # type: ignore # pyright: ignore[reportMissingImports]
                 await discord_integration.cmd_scores(message, [])
                 return
 
             if content.startswith('!endgame') or content.startswith('/endgame') or content.startswith('!конецигры') or content.startswith('/конецигры'):
-                from games.discord_integration import discord_integration
+                from games.discord_integration import discord_integration # type: ignore # pyright: ignore[reportMissingImports]
                 await discord_integration.cmd_endgame(message, [])
                 return
 
-            # Обработка ответов на игры (без префикса)
-            from games.game_manager import game_manager
+                       # Обработка ответов на игры (без префикса)
+            from games.game_manager import game_manager # type: ignore # pyright: ignore[reportMissingImports]
             if message.author and message.author.id in game_manager.sessions:  # type: ignore[union-attr]
                 if not content.startswith('!') and not content.startswith('/'):
-                    from games.discord_integration import discord_integration
-                    await discord_integration.cmd_move(message, [content])
+                    try:
+                        from games import discord_integration # type: ignore # pyright: ignore[reportMissingImports]
+                    except ImportError:
+                        discord_integration = None
+                    
+                    if discord_integration is not None:
+                        await discord_integration.cmd_move(message, [content])
                     return
+
 
         # Проверяем, что сообщение содержит упоминание бота
         if bot.user.mentioned_in(message):
@@ -4390,15 +4390,18 @@ def _ensure_dirs_for_save_reactions():
         return None, None
 
 
-def _audit_save_reactions_action(action: str, actor: str = None, details: dict | None = None, prev_config: dict | None = None):
+def _audit_save_reactions_action(action: str, actor: str | None = None, details: dict | None = None, prev_config: dict | None = None):
     """Записывает аудит и создает бэкап предыдущей конфигурации перед изменением save_reactions."""
     try:
         log_dir, backups_dir = _ensure_dirs_for_save_reactions()
         ts = time.strftime('%Y%m%dT%H%M%S', time.gmtime())
-        actor = actor or os.getenv('USERNAME') or os.getenv('USER') or 'cli'
+        
+        # Гарантируем, что actor всегда будет строкой (str), даже если пришел None
+        actor_str = str(actor or os.getenv('USERNAME') or os.getenv('USER') or 'cli')
+        
         audit = {
             'timestamp': ts,
-            'actor': actor,
+            'actor': actor_str,
             'action': action,
             'details': details or {}
         }
@@ -4422,14 +4425,13 @@ def _audit_save_reactions_action(action: str, actor: str = None, details: dict |
                 _saved_print = _builtins.print
                 try:
                     _builtins.print = _orig_print
-                    logger._write(f"AUDIT: {audit}")
+                    logger._write(f"AUDIT: {json.dumps(audit, ensure_ascii=False)}")
                 finally:
                     _builtins.print = _saved_print
             except Exception:
                 pass
     except Exception:
         pass
-
 
 def _list_backups(limit: int = 20):
     log_dir, backups_dir = _ensure_dirs_for_save_reactions()
@@ -4854,11 +4856,26 @@ if __name__ == "__main__":
                         logger.console = True
                 except Exception:
                     pass
+            
+            # Временно возвращаем оригинальный print, чтобы увидеть критическую ошибку падения
+            import builtins as _builtins
+            if '_orig_print' in globals():
+                _builtins.print = _orig_print
+                
             print("=" * 50)
             print(" Запуск...")
             print(" Автоматическое переподключение включено")
             print("=" * 50)
-            run_main_loop()
+            
+            try:
+                run_main_loop()
+            except Exception as e:
+                print("\n" + "💥" * 20)
+                print("КРИТИЧЕСКАЯ ОШИБКА ВНУТРИ run_main_loop():")
+                print("💥" * 20)
+                traceback.print_exc(file=sys.stdout)
+                print("=" * 50 + "\n")
+                sys.exit(1)
 
     except KeyboardInterrupt:
         print("\n Отключено администратором")
@@ -4869,3 +4886,4 @@ if __name__ == "__main__":
         print(" Проверьте настройки и перезапустите...")
         import traceback
         traceback.print_exc()
+
